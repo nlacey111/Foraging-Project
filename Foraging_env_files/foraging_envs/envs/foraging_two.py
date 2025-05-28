@@ -79,8 +79,7 @@ class ForagingClass2(gym.Env):
         observation = np.array([action, reward], dtype = np.float32)
         
       
-        if self.flower_count == self.episode_length:
-        #self.iteration == self.episode_length:
+        if self.iteration == self.episode_length:
             terminated = True
             # update all episodic history 
             self.stay_time_hist_all_ep.append(self.stay_time_hist_ep)
