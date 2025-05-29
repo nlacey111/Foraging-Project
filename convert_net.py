@@ -41,13 +41,20 @@ class CustomNetwork(nn.Module):
             module_list.append(nn.ReLU())
         return module_list
 
-    # net1 is original, net2 is the one to copy to  
-    def copy_weights(net1, net2):
-        params1 = list(net1.get_parameters())
-        params2 = list(net2.get_parameters())
-        for i in range(len(params1)):
-            params2[i].set(params1[i])
-        return net2
+# net1 is original, net2 is the one to copy to  
+def copy_weights(from_net, to_net):
+    copied_params = []
+
+    for key in from_net.get_parameters()['policy'].keys():
+        if "q_net_target" in key:
+            copied_params.append(from_net.get_parameters()['policy'][key])
+
+    params2 = list(to_net.parameters())
+    for i in range(len(params2)):
+        params2[i].requires_grad = False  # Disable gradient updates for the copied parameters
+        params2[i].copy_(copied_params[i])
+        params2[i].requires_grad = True  # Re-enable gradient updates
+    return to_net
     
 
     
