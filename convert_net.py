@@ -39,7 +39,7 @@ class CustomNetwork(nn.Module):
 
         self.net = nn.Sequential(
             nn.Linear(self.obs_space, self.net_arch[0]),
-            nn.ReLU(),
+            self.activation_fn(),
             *self.mod_list,  # Unpack the module list
             nn.Linear(self.net_arch[-1], self.action_space),  # Assuming the last layer of mod_list is connected to this
         )
@@ -58,7 +58,7 @@ class CustomNetwork(nn.Module):
         module_list = []
         for i in range(len(self.net_arch)-1):
             module_list.append(nn.Linear(self.net_arch[i], self.net_arch[i+1]))
-            module_list.append(nn.ReLU())
+            module_list.append(self.activation_fn())
         return module_list
 
 # net1 is original, net2 is the one to copy to  
@@ -163,7 +163,10 @@ def create_model(env_dict, model_type, net_arch, activation_fn, total_timesteps)
     # wrap env in Monitor to log rewards and other info
     env = Monitor(env, log_dur)
 
-
+    # for saving
+    # env = env.env
+    # model.set_env(env)
+    # model.save("path", include = ["env"])
 
 
     # choose callback function. this will save the best model based on the mean reward
