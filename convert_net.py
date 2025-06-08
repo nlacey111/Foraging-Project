@@ -18,6 +18,8 @@ from stable_baselines3.common.results_plotter import plot_results,  ts2xy
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 import datetime
 from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
+
 
 
 
@@ -123,7 +125,8 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
 
         return True
     
-def create_model(env_dict, model_type, net_arch, activation_fn, total_timesteps):
+def create_model(env_dict, model_type, net_arch, activation_fn, total_timesteps, describe = "First run"):
+
     
     env = gym.make(env_dict['env_name'], 
                    episode_length = env_dict["episode_length"], 
@@ -146,7 +149,7 @@ def create_model(env_dict, model_type, net_arch, activation_fn, total_timesteps)
     policy_kwargs = dict(net_arch = net_arch, 
                          activation_fn = activation_fn)
     if model_type == "DQN":
-        model = DQN("MlpPolicy", env, verbose=1, policy_kwargs = policy_kwargs)
+        model = DQN("MlpPolicy", env, verbose=1, policy_kwargs = policy_kwargs, learning_starts = 1000, seed= 42)
     elif model_type == "PPO":
         model = PPO("MlpPolicy", env, verbose=1, policy_kwargs = policy_kwargs)
     else:
@@ -154,7 +157,7 @@ def create_model(env_dict, model_type, net_arch, activation_fn, total_timesteps)
     
     model_type = str(model.policy._get_name()) # will be DQNPolicy or PPOPolicy, etc.
 
-    log_dur = f"Saved Models/{env_name}/{model_type}_{str(datetime.datetime.now())[:10]}/"
+    log_dur = f"Saved Models/{env_name}/{model_type}_{describe}/"
     if not os.path.exists(log_dur):
         os.makedirs(log_dur)
     print(f"Logging to {log_dur}")
@@ -163,21 +166,28 @@ def create_model(env_dict, model_type, net_arch, activation_fn, total_timesteps)
     # wrap env in Monitor to log rewards and other info
     env = Monitor(env, log_dur)
 
-    # for saving
-    # env = env.env
-    # model.set_env(env)
-    # model.save("path", include = ["env"])
-
-
+    
     # choose callback function. this will save the best model based on the mean reward
     # and also evaluate the model every 1000 steps
-    callback = EvalCallback(env, best_model_save_path=log_dur, log_path=log_dur, eval_freq=1000, deterministic=True, n_eval_episodes=5)
+    eval_callback = EvalCallback(env, best_model_save_path=log_dur, log_path=log_dur, eval_freq=500, deterministic=False, n_eval_episodes = 10)
+    check_callback = CheckpointCallback(save_freq=2500, save_path=log_dur, name_prefix='model_checkpoint')
+    # combine the two callbacks
+    callback = CallbackList([eval_callback, check_callback])
     model.learn(total_timesteps=total_timesteps, progress_bar=False, log_interval=4, callback = callback)
+
 
     # print a string so I can load the best model later 
     print(f"Model saved to {log_dur}best_model.zip")
     # return the model and the log directory
     
+    env = env.env  # Get the original environment from the Monitor wrapper
+    model.set_env(env)  # Set the environment for the model
+    print(f"Model environment set to {env.spec.id}")
+    print(model.get_env())
+    model.save(log_dur + "generic_save.zip", include = ["env"])
+
+    print(f"Unwrapped model saved to {log_dur}generic_save.zip")
+
     # Create the network copy 
     state, info = env.reset()
     n_observations = len(state)
@@ -188,4 +198,6 @@ def create_model(env_dict, model_type, net_arch, activation_fn, total_timesteps)
     print(f"Network copy created with architecture: {network_copy_args['net_arch']} and activation function: {network_copy_args['activation_fn'].__name__}")
     
     # save the network copy to the log directory
+    torch.save(network_copy.state_dict(), log_dur + "network_copy.pth")
+    print(f"Network copy saved to {log_dur}network_copy.pth")
     
